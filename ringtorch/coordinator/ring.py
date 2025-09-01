@@ -48,4 +48,5 @@ class RingExecutor:
 
     def reset_all(self, seq_id: int):
         for w in self.workers:
+            # allow ample time for workers to clear state
             requests.post(f"{w['url']}/reset", json={"seq_id": seq_id}, timeout=30)

@@ -30,3 +30,18 @@ GPU layering and sharding over network.
    ```bash
    pytest -q tests/test_ring_fake_tensor.py
    ```
+
+### One-shot forward-round test (no pytest)
+```bash
+python - <<'PY'
+import torch, time
+from ringtorch.coordinator.ring import RingExecutor
+workers=[{"url":"http://127.0.0.1:9000"},{"url":"http://127.0.0.1:9001"}]
+ring=RingExecutor(workers, n_layers=32)
+ring.load_all(model_id=None, arch="dummy")
+torch.manual_seed(0)
+x=torch.randn(1,16,4096,dtype=torch.float16)
+t=time.time(); y=ring.forward_round(x, seq_id=0)
+print("latency:", round(time.time()-t,3),"s","shape:",tuple(y.shape),"changed:",not torch.allclose(x,y))
+PY
+```
