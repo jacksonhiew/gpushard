@@ -15,6 +15,10 @@ from .schemas import (
 from ..common.tensor_io import tensor_to_b64, b64_to_tensor
 
 
+class LoadResponseWithDtype(LoadResponse):
+    compute_dtype: str
+
+
 def _normalize_device(dev: str) -> str:
     # PyTorch ROCm exposes AMD via 'cuda' device type too
     if dev.startswith("hip"):
@@ -40,18 +44,29 @@ DTYPE = {
 engine = TorchSliceEngine(device=DEVICE, dtype=DTYPE)
 app = FastAPI()
 
-@app.post("/load", response_model=LoadResponse)
+
+@app.post("/load", response_model=LoadResponseWithDtype)
 def load(req: LoadRequest):
     hidden_size = engine.load(req.model_id, req.arch, req.layer_start, req.layer_end)
-    return LoadResponse(ok=True, hidden_size=hidden_size)
+    return LoadResponseWithDtype(
+        ok=True, hidden_size=hidden_size, compute_dtype=str(engine.dtype)
+    )
 
 @app.post("/forward", response_model=ForwardResponse)
 def forward(req: ForwardRequest):
     # Shape guard: [B,T,H] and H must match engine.hidden_size when known
     if len(req.shape) != 3:
-        raise HTTPException(status_code=422, detail=f"Expected [B,T,H], got {req.shape}")
+        raise HTTPException(
+            status_code=422,
+            detail={"error": f"Expected [B,T,H], got {req.shape}"},
+        )
     if engine.hidden_size and req.shape[-1] != engine.hidden_size:
-        raise HTTPException(status_code=422, detail=f"H mismatch: {req.shape[-1]} != {engine.hidden_size}")
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": f"H mismatch: {req.shape[-1]} != {engine.hidden_size}"
+            },
+        )
     hidden = b64_to_tensor(req.hidden_b64, req.shape, engine.device, engine.dtype)
     out = engine.forward_slice(hidden, req.seq_id)
     b64, shape = tensor_to_b64(out)

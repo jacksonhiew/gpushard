@@ -32,6 +32,7 @@ def test_ring_fake_tensor():
     np.random.seed(0)
     p1 = start_worker(9000, "cpu")
     p2 = start_worker(9001, "cpu")
+    time.sleep(1.0)
     try:
         r1 = requests.get("http://127.0.0.1:9000/stats").json()
         r2 = requests.get("http://127.0.0.1:9001/stats").json()
