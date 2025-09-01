@@ -1,0 +1,29 @@
+FROM pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# System deps kept minimal; rely on Python healthcheck commands in compose
+RUN python -m pip install --upgrade pip
+
+# Preinstall runtime deps explicitly to avoid re-installing torch CPU
+RUN pip install --no-cache-dir -U \
+    fastapi \
+    uvicorn \
+    requests \
+    transformers
+
+# Copy project files needed for installation
+COPY pyproject.toml /app/
+COPY ringtorch /app/ringtorch
+
+# Install package in editable mode without pulling dependencies again
+RUN pip install --no-cache-dir -e . --no-deps
+
+EXPOSE 9000
+
+ENV WORKER_DEVICE=cuda:0
+
+CMD ["uvicorn", "ringtorch.worker.server:app", "--host", "0.0.0.0", "--port", "9000"]

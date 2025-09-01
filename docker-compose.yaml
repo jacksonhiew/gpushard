@@ -1,0 +1,70 @@
+networks:
+  ringnet:
+    driver: bridge
+
+services:
+  worker_cuda:
+    build:
+      context: .
+      dockerfile: Dockerfile.cuda
+    image: gpushard-worker-cuda:latest
+    container_name: worker_cuda
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - WORKER_DEVICE=cuda:0
+    runtime: nvidia
+    ports:
+      - "9000:9000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests,sys; sys.exit(0 if requests.get('http://localhost:9000/stats', timeout=2).ok else 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - ringnet
+
+  worker_rocm:
+    build:
+      context: .
+      dockerfile: Dockerfile.rocm
+    image: gpushard-worker-rocm:latest
+    container_name: worker_rocm
+    environment:
+      - HIP_VISIBLE_DEVICES=0
+      - WORKER_DEVICE=cuda:0
+    # Access to AMD devices; privileged may be required depending on host setup
+    privileged: true
+    devices:
+      - "/dev/kfd:/dev/kfd"
+      - "/dev/dri:/dev/dri"
+    ports:
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests,sys; sys.exit(0 if requests.get('http://localhost:9001/stats', timeout=2).ok else 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - ringnet
+
+  coordinator:
+    build:
+      context: .
+      dockerfile: Dockerfile.cuda
+    image: gpushard-coordinator:latest
+    container_name: coordinator
+    command: ["uvicorn", "ringtorch.coordinator.server:app", "--host", "0.0.0.0", "--port", "8787"]
+    ports:
+      - "8787:8787"
+    depends_on:
+      worker_cuda:
+        condition: service_healthy
+      worker_rocm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests,sys; sys.exit(0 if requests.get('http://localhost:8787/docs', timeout=2).ok else 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - ringnet

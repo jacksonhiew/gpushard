@@ -7,7 +7,6 @@ GPU layering and sharding over network.
    ```bash
    python -m venv .venv
    source .venv/bin/activate
-   # from repo root
    pip install -e .
    ```
 
@@ -45,3 +44,50 @@ t=time.time(); y=ring.forward_round(x, seq_id=0)
 print("latency:", round(time.time()-t,3),"s","shape:",tuple(y.shape),"changed:",not torch.allclose(x,y))
 PY
 ```
+
+## Running with Docker
+
+- Requirements:
+  - Docker 24+ and Docker Compose
+  - NVIDIA: NVIDIA drivers + nvidia-container-toolkit
+  - AMD: ROCm drivers; ensure `/dev/kfd` and `/dev/dri` are available to containers
+
+1. Build and start the stack:
+   ```bash
+   docker compose up --build -d
+   ```
+
+2. Verify services are healthy:
+   ```bash
+   curl -s http://127.0.0.1:9000/stats | jq .   # NVIDIA worker
+   curl -s http://127.0.0.1:9001/stats | jq .   # ROCm worker
+   curl -I http://127.0.0.1:8787/docs            # Coordinator docs
+   ```
+
+3. One‑shot forward‑round test against container workers:
+   ```bash
+   python - <<'PY'
+import torch, time
+from ringtorch.coordinator.ring import RingExecutor
+workers=[{"url":"http://127.0.0.1:9000"},{"url":"http://127.0.0.1:9001"}]
+ring=RingExecutor(workers, n_layers=32)
+ring.load_all(model_id=None, arch="dummy")
+torch.manual_seed(0)
+x=torch.randn(1,16,4096,dtype=torch.float16)
+t=time.time(); y=ring.forward_round(x, seq_id=0)
+print("latency:", round(time.time()-t,3),"s","shape:",tuple(y.shape),"changed:",not torch.allclose(x,y))
+PY
+   ```
+
+### Scaling workers automatically (optional)
+
+Use the helper to generate one worker per detected GPU and wire coordinator env with their URLs:
+
+```bash
+scripts/generate_compose.sh
+docker compose -f docker-compose.yaml -f docker-compose.override.yaml up --build -d
+```
+
+Notes:
+- ROCm: PyTorch’s ROCm build exposes AMD GPUs via the `cuda` device type. Keep `HIP_VISIBLE_DEVICES` for card selection, but set `WORKER_DEVICE=cuda:0`.
+- Mixed‑vendor hosts are supported: `worker_cuda` exposes 9000, `worker_rocm` exposes 9001.

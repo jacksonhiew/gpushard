@@ -15,5 +15,9 @@ dependencies = [
     "transformers",
 ]
 
+[tool.setuptools.packages.find]
+include = ["ringtorch*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+

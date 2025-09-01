@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: ringtorch
+Version: 0.1.0
+Summary: Minimal Exo-style ring for PyTorch
+Requires-Python: >=3.10
+License-File: LICENSE
+Requires-Dist: fastapi
+Requires-Dist: uvicorn
+Requires-Dist: requests
+Requires-Dist: torch
+Requires-Dist: transformers
+Dynamic: license-file
