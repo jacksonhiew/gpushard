@@ -12,18 +12,20 @@ from .schemas import (
 from ..common.tensor_io import tensor_to_b64, b64_to_tensor
 
 
+def _normalize_device(dev: str) -> str:
+    if dev.startswith("hip"):
+        return "cuda" + dev[3:]
+    return dev
+
+
 def get_free_vram_mb(device: str) -> int:
     if device.startswith("cuda") and torch.cuda.is_available():
-        idx = int(device.split(":")[1]) if ":" in device else 0
-        free, _ = torch.cuda.mem_get_info(idx)
-        return int(free // (1024 * 1024))
-    if device.startswith("hip") and torch.cuda.is_available():
-        idx = int(device.split(":")[1]) if ":" in device else 0
-        free, _ = torch.cuda.mem_get_info(idx)
+        free, _ = torch.cuda.mem_get_info(torch.device(device))
         return int(free // (1024 * 1024))
     return 0
 
-DEVICE = os.environ.get("WORKER_DEVICE", "cpu")
+
+DEVICE = _normalize_device(os.environ.get("WORKER_DEVICE", "cpu"))
 DTYPE = {
     "fp16": torch.float16,
     "bf16": torch.bfloat16,

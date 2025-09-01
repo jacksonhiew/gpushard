@@ -3,6 +3,7 @@ import time
 import multiprocessing
 import requests
 import torch
+import numpy as np
 
 from ringtorch.coordinator.ring import RingExecutor
 
@@ -27,6 +28,8 @@ def start_worker(port: int, device: str):
 
 
 def test_ring_fake_tensor():
+    torch.manual_seed(0)
+    np.random.seed(0)
     p1 = start_worker(9000, "cpu")
     p2 = start_worker(9001, "cpu")
     try:

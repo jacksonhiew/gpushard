@@ -34,11 +34,15 @@ class TorchSliceEngine:
             model = AutoModelForCausalLM.from_pretrained(
                 model_id,
                 torch_dtype=self.dtype,
-                device_map={"": self.device},
+                low_cpu_mem_usage=True,
+                device_map="cpu",
             )
             blocks = model_slicer.slice_blocks(model, arch, start, end)
             self.model = blocks.to(self.device, dtype=self.dtype)
             self.hidden_size = model.config.hidden_size
+            del model
+            if self.device.startswith("cuda") and torch.cuda.is_available():
+                torch.cuda.empty_cache()
         return self.hidden_size
 
     def forward_slice(self, hidden: torch.Tensor, seq_id: int) -> torch.Tensor:
