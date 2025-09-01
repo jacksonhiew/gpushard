@@ -21,13 +21,12 @@ class TorchSliceEngine:
     def load(self, model_id: Optional[str], arch: str, start: int, end: int, hidden_size: int = 4096):
         self.start, self.end = start, end
         if model_id is None:
-            self.hidden_size = hidden_size
             layers = []
+            # [dummy stack] Linear + LayerNorm repeating with fixed hidden size
             for _ in range(end - start):
-                layers.append(nn.Sequential(
-                    nn.Linear(hidden_size, hidden_size, bias=False),
-                    nn.LayerNorm(hidden_size)
-                ))
+                layers.append(nn.Linear(hidden_size, hidden_size, bias=False))
+                layers.append(nn.LayerNorm(hidden_size))
+            self.hidden_size = hidden_size
             self.model = nn.Sequential(*layers).to(self.device, dtype=self.dtype)
         else:
             from transformers import AutoModelForCausalLM
@@ -40,9 +39,12 @@ class TorchSliceEngine:
             blocks = model_slicer.slice_blocks(model, arch, start, end)
             self.model = blocks.to(self.device, dtype=self.dtype)
             self.hidden_size = model.config.hidden_size
-            del model
-            if self.device.startswith("cuda") and torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            try:
+                del model
+                if self.device.startswith("cuda") and torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except Exception:
+                pass
         return self.hidden_size
 
     def forward_slice(self, hidden: torch.Tensor, seq_id: int) -> torch.Tensor:

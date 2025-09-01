@@ -7,16 +7,19 @@ GPU layering and sharding over network.
    ```bash
    python -m venv .venv
    source .venv/bin/activate
-   pip install -e ringtorch
+   # from repo root
+   pip install -e .
    ```
 
 2. Launch workers (adjust ports/devices as needed):
    ```bash
    CUDA_VISIBLE_DEVICES=0 ringtorch/scripts/launch_worker_cuda.sh
-   HIP_VISIBLE_DEVICES=0 WORKER_DEVICE=cuda:0 ringtorch/scripts/launch_worker_hip.sh   # or set WORKER_DEVICE=cpu
+   HIP_VISIBLE_DEVICES=0 ringtorch/scripts/launch_worker_hip.sh  # ROCm build; uses WORKER_DEVICE=cuda:0
    ```
 
-   > **ROCm note:** PyTorch with ROCm still uses the `cuda` device type. Run AMD workers with `WORKER_DEVICE=cuda:0`. Using `hip:0` will not work.
+   > **ROCm note:** PyTorch’s ROCm build exposes AMD GPUs via the `cuda` device type.
+   > Keep `HIP_VISIBLE_DEVICES` for card selection, but set `WORKER_DEVICE=cuda:0`.
+   > Using `hip:0` as a torch device will not work.
 
 3. Launch coordinator:
    ```bash
